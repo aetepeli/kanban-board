@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: taskflow_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ahmet9110*
+      POSTGRES_DB: taskflow_local
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d taskflow_local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  cache:
+    image: redis:7-alpine
+    container_name: taskflow_cache
+    restart: always
+    ports:
+      - "6379:6379"
+
+  server:
+    build:
+      context: ./server
+    container_name: taskflow_server
+    restart: always
+    command: sh -c "npx prisma db push && node dist/server.js"
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./server/.env
+    environment:
+      DATABASE_URL: postgresql://postgres:ahmet9110*@db:5432/taskflow_local?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ./client
+    container_name: taskflow_client
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+
+volumes:
+  pgdata:
