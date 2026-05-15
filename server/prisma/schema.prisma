@@ -1,0 +1,154 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User  {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  fullName      String 
+  password      String 
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now())
+
+  isEmailVerified   Boolean    @default(false)
+
+  tfaSecret     String?
+  isTfaEnabled  Boolean        @default(false)
+
+  ownedBoards   Board[]        @relation("BoardOwner")
+  assignedCard  Card[]         @relation("CardAssignee") 
+  memberships   BoardMember[]
+  comments      Comment[]
+  userLogs      UserActivityLog[]
+  boardLogs     BoardActivityLog[]
+}
+
+model Board {
+  id            String         @id @default(uuid())
+  title         String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now())
+
+  ownerId       String         
+  owner         User           @relation("BoardOwner", fields: [ownerId], references: [id])
+  columns       Column[]
+  members       BoardMember[]
+  boardLogs     BoardActivityLog[]
+}
+
+model Column {
+  id            String         @id @default(uuid())
+  title         String
+  order         Int
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now())
+
+  boardId       String
+  board         Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  card          Card[]
+
+  @@index([boardId, order])
+  @@unique([boardId, title])
+}
+
+model Card {
+  id            String         @id @default(uuid())
+  title         String
+  content       String
+  order         Int
+  priority      Priority       @default(MEDIUM)
+  deadline      DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now())
+
+  columnId      String
+  column        Column         @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  assigneeId    String?
+  assignee      User?          @relation("CardAssignee", fields: [assigneeId], references: [id])
+
+  comments      Comment[]
+
+  @@index([columnId, order])
+}
+
+model Comment {
+  id            String         @id @default(uuid())
+  content       String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now())
+  
+  cardId        String
+  card          Card           @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+}
+
+model BoardMember{
+  id            String         @id @default(uuid())
+  role          BoardRole      @default(ASSIGNEE)
+  joinedAt      DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now())
+
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+
+  boardId       String
+  board         Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, boardId])
+}
+
+model UserActivityLog {
+  id            String         @id @default(uuid())
+  action        String
+  details       String?
+  ipAddress     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now())
+
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model BoardActivityLog {
+  id            String         @id @default(uuid())
+  action        String
+  details       String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now())
+
+  boardId       String
+  board         Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade )
+
+  @@index([boardId, createdAt(sort: Desc)])
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum BoardRole {
+  OWNER   // Board ile ilgili her şeyi yapabilir
+  ASSIGNEE  // Kart taşıyabilir, yorum yapabilir
+}
